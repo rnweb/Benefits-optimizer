@@ -332,10 +332,8 @@ class _ProductDetailWidgetState extends State<ProductDetailWidget> {
                             Text(
                               'R\$ ${(_deals[0]['store_price'] as num).toStringAsFixed(2)}',
                               style: FlutterFlowTheme.of(context).titleLarge.override(
-                                    color: Colors.white,
+                                    color: Colors.white54,
                                     fontWeight: FontWeight.bold,
-                                    decoration: TextDecoration.lineThrough,
-                                    decorationColor: Colors.white54,
                                   ),
                             ),
                           ],
