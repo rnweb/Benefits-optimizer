@@ -51,7 +51,17 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           name: HomePageWidget.routeName,
           path: HomePageWidget.routePath,
           builder: (context, params) => HomePageWidget(),
-        )
+        ),
+        FFRoute(
+          name: GoalSelectorWidget.routeName,
+          path: GoalSelectorWidget.routePath,
+          builder: (context, params) => GoalSelectorWidget(),
+        ),
+        FFRoute(
+          name: WalletWidget.routeName,
+          path: WalletWidget.routePath,
+          builder: (context, params) => WalletWidget(),
+        ),
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );
 
@@ -100,7 +110,7 @@ class FFParameters {
   bool get isEmpty =>
       state.allParams.isEmpty ||
       (state.allParams.length == 1 &&
-          state.extraMap.containsKey(kTransitionInfoKey));
+          extraMap.containsKey(kTransitionInfoKey));
   bool isAsyncParam(MapEntry<String, dynamic> param) =>
       asyncParams.containsKey(param.key) && param.value is String;
   bool get hasFutures => state.allParams.entries.any(isAsyncParam);
