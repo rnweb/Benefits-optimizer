@@ -4,22 +4,14 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '/backend/api_requests/api_calls.dart';
 
 class WalletModel extends FlutterFlowModel {
-  /// Initialization and disposal methods.
-
   @override
   void initState(BuildContext context) {}
 
   @override
   void dispose() {}
-
-  /// Action blocks are added here.
-
-  /// Additional helper methods are added here.
 }
 
 class WalletWidget extends StatefulWidget {
@@ -51,24 +43,31 @@ class _WalletWidgetState extends State<WalletWidget> {
     setState(() => _isLoading = true);
 
     try {
-      // Load all credit cards from Supabase
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Load all credit cards
       final cardsResponse = await Supabase.instance.client
           .from('credit_cards')
           .select()
           .eq('is_active', true);
 
       // Load user's wallet
-      final walletResponse = await WalletCall.getWallet();
-      final walletData = walletResponse.jsonBody ?? [];
+      final walletResponse = await Supabase.instance.client
+          .from('user_wallet')
+          .select('*, credit_cards(*)')
+          .eq('user_id', user.id);
 
-      // Filter available cards (not in wallet)
-      final userCardIds = walletData
+      final userCardIds = (walletResponse as List)
           .map((w) => w['credit_card_id'])
           .where((id) => id != null)
           .toSet();
 
       setState(() {
-        _userCards = walletData;
+        _userCards = walletResponse;
         _availableCards = (cardsResponse as List)
             .where((card) => !userCardIds.contains(card['id']))
             .toList();
@@ -81,12 +80,26 @@ class _WalletWidgetState extends State<WalletWidget> {
   }
 
   Future<void> _addCard(String cardId) async {
-    await WalletCall.addCard(creditCardId: cardId, isPrimary: false);
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    await Supabase.instance.client.from('user_wallet').upsert({
+      'user_id': user.id,
+      'credit_card_id': cardId,
+      'is_primary': false,
+    });
     _loadData();
   }
 
   Future<void> _removeCard(String cardId) async {
-    await WalletCall.removeCard(creditCardId: cardId);
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    await Supabase.instance.client
+        .from('user_wallet')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('credit_card_id', cardId);
     _loadData();
   }
 
@@ -121,7 +134,6 @@ class _WalletWidgetState extends State<WalletWidget> {
                     ),
                     color: Colors.white,
                     fontSize: 22.0,
-                    fontWeight: FontWeight.bold,
                   ),
             ),
           ],
@@ -139,7 +151,6 @@ class _WalletWidgetState extends State<WalletWidget> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Your Cards Section
                     Text(
                       'Your Cards (${_userCards.length})',
                       style:
@@ -148,7 +159,6 @@ class _WalletWidgetState extends State<WalletWidget> {
                                   fontWeight: FontWeight.w600,
                                 ),
                                 fontSize: 18.0,
-                                fontWeight: FontWeight.w600,
                               ),
                     ),
                     SizedBox(height: 12.0),
@@ -187,7 +197,6 @@ class _WalletWidgetState extends State<WalletWidget> {
                     else
                       ..._userCards.map((wallet) => _buildUserCard(wallet)),
                     SizedBox(height: 24.0),
-                    // Available Cards Section
                     Text(
                       'Available Cards',
                       style:
@@ -196,7 +205,6 @@ class _WalletWidgetState extends State<WalletWidget> {
                                   fontWeight: FontWeight.w600,
                                 ),
                                 fontSize: 18.0,
-                                fontWeight: FontWeight.w600,
                               ),
                     ),
                     SizedBox(height: 12.0),
@@ -213,7 +221,6 @@ class _WalletWidgetState extends State<WalletWidget> {
               context.goNamed('HomePage');
               break;
             case 1:
-              // Already on Wallet
               break;
             case 2:
               context.goNamed('GoalSelector');
@@ -275,12 +282,11 @@ class _WalletWidgetState extends State<WalletWidget> {
                   style: FlutterFlowTheme.of(context).titleSmall.override(
                         fontWeight: FontWeight.w600,
                         fontSize: 16.0,
-                        fontWeight: FontWeight.w600,
                       ),
                 ),
                 SizedBox(height: 4.0),
                 Text(
-                  '${card['domestic_pts_per_dollar'] ?? 0} pts/\$ domestic • ${card['intl_pts_per_dollar'] ?? 0} pts/\$ intl',
+                  '${card['domestic_pts_per_dollar'] ?? 0} pts/\$ domestic - ${card['intl_pts_per_dollar'] ?? 0} pts/\$ intl',
                   style: FlutterFlowTheme.of(context).bodySmall.override(
                         color: FlutterFlowTheme.of(context).secondaryText,
                         fontSize: 12.0,
@@ -362,12 +368,11 @@ class _WalletWidgetState extends State<WalletWidget> {
                   style: FlutterFlowTheme.of(context).titleSmall.override(
                         fontWeight: FontWeight.w600,
                         fontSize: 16.0,
-                        fontWeight: FontWeight.w600,
                       ),
                 ),
                 SizedBox(height: 4.0),
                 Text(
-                  '${card['domestic_pts_per_dollar'] ?? 0} pts/\$ domestic • ${card['intl_pts_per_dollar'] ?? 0} pts/\$ intl',
+                  '${card['domestic_pts_per_dollar'] ?? 0} pts/\$ domestic - ${card['intl_pts_per_dollar'] ?? 0} pts/\$ intl',
                   style: FlutterFlowTheme.of(context).bodySmall.override(
                         color: FlutterFlowTheme.of(context).secondaryText,
                         fontSize: 12.0,
