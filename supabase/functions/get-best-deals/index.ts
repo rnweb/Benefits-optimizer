@@ -19,12 +19,18 @@ serve(async (req) => {
   }
 
   try {
+    // Optional authorization header: allow anonymous calls
+    const authHeader = req.headers.get('Authorization');
+    const globalHeaders: Record<string, string> = {};
+    if (authHeader) {
+      globalHeaders['Authorization'] = authHeader;
+    }
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: globalHeaders,
         },
       }
     );
@@ -105,18 +111,41 @@ serve(async (req) => {
       }
     }
 
-    // Calculate ERC for all scenarios and rank
+    // Calculate ERC for all scenarios and rank based on goal
     const results = scenarios
       .map((input) => ({
         ...calculateERC(input),
         card_name: input.card.name,
+        card_points: input.card.domestic_pts_per_dollar,
         loyalty_name: input.loyalty_program.name,
+        loyalty_value: input.loyalty_program.value_per_1000_miles,
         cashback_name: input.cashback_program?.name ?? 'None',
+        cashback_pct: input.cashback_program?.percentage ?? 0,
         store_name:
           prices.find((p) => p.price_brl === input.store_price)?.stores?.name ??
           'Unknown',
       }))
-      .sort((a, b) => a.erc - b.erc)
+      .sort((a, b) => {
+        // Goal-based ranking
+        if (goal === 'CASH') {
+          // Cash: prioritize highest cashback, then best points
+          const aScore = (a.cashback_pct * 0.6) + (a.card_points * 0.4);
+          const bScore = (b.cashback_pct * 0.6) + (b.card_points * 0.4);
+          return bScore - aScore || a.erc - b.erc;
+        } else if (goal === 'FAMILY') {
+          // Family: prioritize high-volume loyalty (Azul/Gol), then points
+          const aFamily = a.loyalty_name.includes('Azul') || a.loyalty_name.includes('Gol') ? 1 : 0;
+          const bFamily = b.loyalty_name.includes('Azul') || b.loyalty_name.includes('Gol') ? 1 : 0;
+          return bFamily - aFamily || a.erc - b.erc;
+        } else if (goal === 'LUXURY') {
+          // Luxury: prioritize highest value per mile (Iberia/AA), then card points
+          const aLuxury = a.loyalty_value;
+          const bLuxury = b.loyalty_value;
+          return bLuxury - aLuxury || a.erc - b.erc;
+        }
+        // Default: lowest ERC
+        return a.erc - b.erc;
+      })
       .slice(0, 10); // Top 10
 
     return new Response(JSON.stringify({ goal, top_deals: results }), {

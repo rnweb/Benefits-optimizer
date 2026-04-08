@@ -18,12 +18,18 @@ serve(async (req) => {
   }
 
   try {
+    // Optional authorization header: allow anonymous calls
+    const authHeader = req.headers.get('Authorization');
+    const globalHeaders: Record<string, string> = {};
+    if (authHeader) {
+      globalHeaders['Authorization'] = authHeader;
+    }
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: globalHeaders,
         },
       }
     );

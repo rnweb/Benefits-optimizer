@@ -20,12 +20,19 @@ serve(async (req) => {
   }
 
   try {
+    // Optional authorization header: allow anonymous ERC calculations by not sending
+    // Authorization header if it's not provided by the client.
+    const authHeader = req.headers.get('Authorization');
+    const globalHeaders: Record<string, string> = {};
+    if (authHeader) {
+      globalHeaders['Authorization'] = authHeader;
+    }
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: globalHeaders,
         },
       }
     );
@@ -90,25 +97,27 @@ serve(async (req) => {
 
     const result = calculateERC(input);
 
-    // Store calculation
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser();
-    if (user) {
-      await supabaseClient.from('erc_calculations').insert({
-        user_id: user.id,
-        product_id,
-        store_id,
-        credit_card_id,
-        cashback_program_id,
-        loyalty_program_id,
-        store_price,
-        cashback_amount: result.cashback_amount,
-        miles_value: result.miles_value,
-        transfer_bonus: result.transfer_bonus_value,
-        erc: result.erc,
-        calculation_details: result.breakdown,
-      });
+    // Store calculation only if user is authenticated
+    if (authHeader) {
+      const {
+        data: { user },
+      } = await supabaseClient.auth.getUser();
+      if (user) {
+        await supabaseClient.from('erc_calculations').insert({
+          user_id: user.id,
+          product_id,
+          store_id,
+          credit_card_id,
+          cashback_program_id,
+          loyalty_program_id,
+          store_price,
+          cashback_amount: result.cashback_amount,
+          miles_value: result.miles_value,
+          transfer_bonus: result.transfer_bonus_value,
+          erc: result.erc,
+          calculation_details: result.breakdown,
+        });
+      }
     }
 
     return new Response(JSON.stringify(result), {
